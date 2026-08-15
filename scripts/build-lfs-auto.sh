@@ -48,7 +48,6 @@ JHALFSDIR=$JHALFS_BUILD
 SRC_ARCHIVE=$WORK_DIR/source-archive
 GETPKG=y
 RUNMAKE=y
-RUN_ME="./jhalfs run"
 PKGMNGT=n
 N_PARALLEL=$JOBS
 OPTIMIZE=0
@@ -61,9 +60,11 @@ LGROUP=$LFS_GROUP
 LHOME=$LFS_HOME
 EOF
 
-# jhalfs creates its generated scripts/Makefile under JHALFSDIR. The source
-# checkout is intentionally elsewhere, so its source/build sanity check passes.
-printf 'yes\n' | ./jhalfs run
+# The supported jhalfs entrypoint is its Makefile. Running ./jhalfs directly
+# is not the normal build interface and can fail after configuration validation.
+# The existing configuration file is loaded by make, and the confirmation is
+# answered non-interactively for Actions.
+printf 'yes\n' | make
 
 if [ -d "$BUILD_DIR/lfs" ]; then
   rm -rf "$ROOT_DIR"
