@@ -29,7 +29,11 @@ jobs:
             build-essential bison gawk texinfo wget curl git xz-utils bzip2 cpio gzip rsync \
             xorriso grub-pc-bin grub-efi-amd64-bin grub-efi-amd64-signed shim-signed \
             dosfstools mtools squashfs-tools bc flex libelf-dev libssl-dev \
-            xsltproc docbook-xml docbook-xsl libxml2-utils sudo
+            xsltproc docbook-xml docbook-xsl libxml2-utils sudo \
+            autoconf automake libtool pkg-config meson ninja-build gettext \
+            libx11-dev libxext-dev libxrender-dev libxrandr-dev libxi-dev \
+            libxinerama-dev libxcursor-dev libxfixes-dev libxcomposite-dev \
+            libxdamage-dev libxss-dev libxkbfile-dev
 
       - name: Make build scripts executable
         run: chmod +x scripts/*.sh packages/porg/*.sh desktop/*.sh iso/*.sh
@@ -47,15 +51,27 @@ jobs:
           ROOT_DIR: ${{ github.workspace }}/work/rootfs
         run: ./scripts/build-system.sh
 
+      - name: Install sudo and configure administration
+        env:
+          ROOT_DIR: ${{ github.workspace }}/work/rootfs
+        run: ./scripts/install-sudo.sh
+
       - name: Install Porg/package tracking
         env:
           ROOT_DIR: ${{ github.workspace }}/work/rootfs
         run: ./packages/porg/build-porg.sh
 
-      - name: Stage Rebuilt LFS desktop configuration
+      - name: Build Xorg and XFCE desktop stack
         env:
           ROOT_DIR: ${{ github.workspace }}/work/rootfs
+          SRC_DIR: ${{ github.workspace }}/work/sources
+          JOBS: 2
         run: ./desktop/build-xfce.sh
+
+      - name: Install XFCE/LXQt session integration
+        env:
+          ROOT_DIR: ${{ github.workspace }}/work/rootfs
+        run: ./desktop/build-desktops.sh
 
       - name: Install desktop launcher and shortcuts
         env:
