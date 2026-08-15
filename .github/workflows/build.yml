@@ -1,0 +1,34 @@
+name: Rebuilt LFS build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bison gawk texinfo wget xz-utils bzip2 cpio gzip rsync
+
+      - name: Prepare Rebuilt LFS workspace
+        run: |
+          chmod +x scripts/build-base.sh scripts/enable-desktop.sh
+          ROOT_DIR="$GITHUB_WORKSPACE/work/rootfs" ./scripts/build-base.sh
+          ROOT_DIR="$GITHUB_WORKSPACE/work/rootfs" ./scripts/enable-desktop.sh
+
+      - name: Package build workspace
+        run: |
+          tar -C work -czf rebuilt-lfs-workspace.tar.gz rootfs
+
+      - name: Upload workspace
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuilt-lfs-workspace
+          path: rebuilt-lfs-workspace.tar.gz
