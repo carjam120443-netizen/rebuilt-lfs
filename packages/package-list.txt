@@ -1,0 +1,45 @@
+# Rebuilt LFS initial desktop package targets
+# These are built in dependency order by the package framework.
+
+# Core / build
+bash
+coreutils
+file
+findutils
+flex
+gawk
+gcc
+grep
+gzip
+m4
+make
+patch
+perl
+sed
+tar
+texinfo
+xz
+
+# Package tracking
+porg
+
+# Networking
+networkmanager
+
+# Xorg
+xorg-server
+xinit
+mesa
+libdrm
+
+# XFCE
+xfce4-session
+xfce4-panel
+xfce4-settings
+xfdesktop
+xfwm4
+xfce4-terminal
+thunar
+
+# Desktop utilities
+mousepad
