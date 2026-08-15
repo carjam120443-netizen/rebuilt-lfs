@@ -17,6 +17,20 @@ LFS_HOME="${LFS_HOME:-/home/lfs}"
 
 mkdir -p "$WORK_DIR" "$BUILD_DIR" "$JHALFS_BUILD" "$(dirname "$JHALFS_SRC")" "$WORK_DIR/source-archive"
 
+# jhalfs validates LHOME as an existing directory. Create the standard LFS
+# build user/group and home on the GitHub-hosted runner before validation.
+if ! getent group "$LFS_GROUP" >/dev/null 2>&1; then
+  sudo groupadd --system "$LFS_GROUP"
+fi
+if ! id -u "$LFS_USER" >/dev/null 2>&1; then
+  sudo useradd --system --gid "$LFS_GROUP" --home-dir "$LFS_HOME" --create-home --shell /bin/bash "$LFS_USER"
+else
+  sudo usermod --home "$LFS_HOME" "$LFS_USER"
+  sudo mkdir -p "$LFS_HOME"
+fi
+sudo mkdir -p "$LFS_HOME"
+sudo chown "$LFS_USER:$LFS_GROUP" "$LFS_HOME"
+
 if [ ! -d "$JHALFS_SRC/.git" ]; then
   git clone --depth=1 https://git.linuxfromscratch.org/jhalfs.git "$JHALFS_SRC"
 fi
