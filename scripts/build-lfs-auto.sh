@@ -17,8 +17,6 @@ LFS_HOME="${LFS_HOME:-/home/lfs}"
 
 mkdir -p "$WORK_DIR" "$BUILD_DIR" "$JHALFS_BUILD" "$(dirname "$JHALFS_SRC")" "$WORK_DIR/source-archive"
 
-# jhalfs validates LHOME as an existing directory. Create the standard LFS
-# build user/group and home on the GitHub-hosted runner before validation.
 if ! getent group "$LFS_GROUP" >/dev/null 2>&1; then
   sudo groupadd --system "$LFS_GROUP"
 fi
@@ -37,34 +35,41 @@ fi
 
 cd "$JHALFS_SRC"
 
-rm -f configuration
+# jhalfs uses Kconfig syntax for this file. String-valued settings must be
+# quoted; otherwise Kconfig silently ignores them and falls back to defaults.
 cat > configuration <<EOF
 BOOK_LFS_SYSD=y
-PROGNAME=lfs
-BRANCH_ID=${LFS_BOOK}
-INITSYS=systemd
-BUILDDIR=$BUILD_DIR
-JHALFSDIR=$JHALFS_BUILD
-SRC_ARCHIVE=$WORK_DIR/source-archive
+PROGNAME="lfs"
+BRANCH_ID="${LFS_BOOK}"
+INITSYS="systemd"
+BUILDDIR="${BUILD_DIR}"
+JHALFSDIR="${JHALFS_BUILD}"
+SRC_ARCHIVE="${WORK_DIR}/source-archive"
 GETPKG=y
 RUNMAKE=y
 PKGMNGT=n
-N_PARALLEL=$JOBS
+N_PARALLEL=${JOBS}
 OPTIMIZE=0
 NO_PROGRESS_BAR=y
 REBUILD_MAKEFILE=n
 CLEAN=n
 BLFS_TOOL=n
-LUSER=$LFS_USER
-LGROUP=$LFS_GROUP
-LHOME=$LFS_HOME
+LUSER="${LFS_USER}"
+LGROUP="${LFS_GROUP}"
+LHOME="${LFS_HOME}"
 EOF
 
-# The supported jhalfs entrypoint is its Makefile. Running ./jhalfs directly
-# is not the normal build interface and can fail after configuration validation.
-# The existing configuration file is loaded by make, and the confirmation is
-# answered non-interactively for Actions.
-printf 'yes\n' | make
+# Make sure menuconfig never tries to open curses in GitHub Actions. The
+# configuration is already complete, so load it through Kconfig's non-UI path
+# and invoke jhalfs' build target directly.
+export TERM=xterm
+if grep -q '^menuconfig:' Makefile && grep -q '^all:' Makefile; then
+  make -s olddefconfig
+  make -s all
+else
+  make -s olddefconfig
+  make -s
+fi
 
 if [ -d "$BUILD_DIR/lfs" ]; then
   rm -rf "$ROOT_DIR"
