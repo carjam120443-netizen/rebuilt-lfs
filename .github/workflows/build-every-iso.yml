@@ -22,33 +22,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install ISO and build dependencies
+      - name: Install LFS, desktop and ISO build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential bison gawk texinfo wget xz-utils bzip2 cpio gzip rsync \
+            build-essential bison gawk texinfo wget curl git xz-utils bzip2 cpio gzip rsync \
             xorriso grub-pc-bin grub-efi-amd64-bin grub-efi-amd64-signed shim-signed \
-            dosfstools mtools squashfs-tools bc flex libelf-dev libssl-dev
+            dosfstools mtools squashfs-tools bc flex libelf-dev libssl-dev \
+            xsltproc docbook-xml docbook-xsl libxml2-utils sudo
 
       - name: Make build scripts executable
         run: chmod +x scripts/*.sh packages/porg/*.sh desktop/*.sh iso/*.sh
 
-      - name: Initialize LFS base
+      - name: Build complete LFS base with official jhalfs
         env:
+          BUILD_DIR: ${{ github.workspace }}/work/lfs-build
           ROOT_DIR: ${{ github.workspace }}/work/rootfs
-        run: ./scripts/build-base.sh
+          JOBS: 2
+          LFS_BOOK: 12.4
+        run: ./scripts/build-lfs-auto.sh
 
-      - name: Assemble runtime userspace
+      - name: Install Rebuilt LFS runtime configuration
         env:
           ROOT_DIR: ${{ github.workspace }}/work/rootfs
         run: ./scripts/build-system.sh
 
-      - name: Build and install Porg
+      - name: Install Porg/package tracking
         env:
           ROOT_DIR: ${{ github.workspace }}/work/rootfs
         run: ./packages/porg/build-porg.sh
 
-      - name: Stage Xorg and XFCE
+      - name: Stage Rebuilt LFS desktop configuration
         env:
           ROOT_DIR: ${{ github.workspace }}/work/rootfs
         run: ./desktop/build-xfce.sh
@@ -58,12 +62,12 @@ jobs:
           ROOT_DIR: ${{ github.workspace }}/work/rootfs
         run: ./scripts/enable-desktop.sh
 
-      - name: Build kernel and initramfs
+      - name: Build Linux kernel and initramfs
         env:
           ROOT_DIR: ${{ github.workspace }}/work/rootfs
         run: ./iso/build-kernel.sh
 
-      - name: Create bootable ISO
+      - name: Create bootable BIOS + UEFI ISO
         env:
           ROOT_DIR: ${{ github.workspace }}/work/rootfs
           OUT_DIR: ${{ github.workspace }}/dist
@@ -72,8 +76,10 @@ jobs:
 
       - name: Verify ISO exists
         run: |
-          test -s dist/*.iso
+          set -eux
+          ls -lh dist/*.iso
           file dist/*.iso
+          test -s dist/*.iso
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
