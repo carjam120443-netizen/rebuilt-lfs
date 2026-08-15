@@ -2,20 +2,18 @@
 set -euo pipefail
 
 # Automated Linux From Scratch build using the official ALFS/jhalfs project.
-# jhalfs creates its working tree under BUILDDIR/jhalfs, so the jhalfs
-# source checkout must live completely outside BUILDDIR.
+# jhalfs is checked out here, while its generated working tree lives under
+# BUILDDIR/jhalfs. These directories must be different.
 
 WORK_DIR="${WORK_DIR:-$PWD/work/lfs}"
 JHALFS_SRC="${JHALFS_SRC:-$PWD/work/jhalfs-source}"
 BUILD_DIR="${BUILD_DIR:-$WORK_DIR/build}"
+JHALFS_BUILD="${JHALFS_BUILD:-$BUILD_DIR/jhalfs}"
 LFS_BOOK="${LFS_BOOK:-12.4}"
 JOBS="${JOBS:-2}"
 ROOT_DIR="${ROOT_DIR:-$PWD/work/rootfs}"
 
-# Keep the source checkout outside the jhalfs build directory. jhalfs itself
-# creates $BUILD_DIR/jhalfs and rejects a source directory that resolves to
-# that working directory.
-mkdir -p "$WORK_DIR" "$BUILD_DIR" "$(dirname "$JHALFS_SRC")"
+mkdir -p "$WORK_DIR" "$BUILD_DIR" "$JHALFS_BUILD" "$(dirname "$JHALFS_SRC")" "$WORK_DIR/source-archive"
 
 if [ ! -d "$JHALFS_SRC/.git" ]; then
   git clone --depth=1 https://git.linuxfromscratch.org/jhalfs.git "$JHALFS_SRC"
@@ -30,6 +28,7 @@ PROGNAME=lfs
 BRANCH_ID=${LFS_BOOK}
 INITSYS=systemd
 BUILDDIR=$BUILD_DIR
+JHALFSDIR=$JHALFS_BUILD
 SRC_ARCHIVE=$WORK_DIR/source-archive
 GETPKG=y
 RUNMAKE=y
@@ -43,12 +42,8 @@ CLEAN=n
 BLFS_TOOL=n
 EOF
 
-mkdir -p "$WORK_DIR/source-archive"
-
-# Do not set JHALFSDIR to the source checkout: current jhalfs derives its
-# source location from the directory containing ./jhalfs and uses JHALFSDIR
-# for its generated working directory. BUILDDIR is the correct separation
-# point for the generated build tree.
+# jhalfs creates its generated scripts/Makefile under JHALFSDIR. The source
+# checkout is intentionally elsewhere, so its source/build sanity check passes.
 printf 'yes\n' | ./jhalfs run
 
 if [ -d "$BUILD_DIR/lfs" ]; then
@@ -57,11 +52,17 @@ if [ -d "$BUILD_DIR/lfs" ]; then
 elif [ -d "$BUILD_DIR/rootfs" ]; then
   rm -rf "$ROOT_DIR"
   mv "$BUILD_DIR/rootfs" "$ROOT_DIR"
+elif [ -d "$JHALFS_BUILD/lfs" ]; then
+  rm -rf "$ROOT_DIR"
+  mv "$JHALFS_BUILD/lfs" "$ROOT_DIR"
+elif [ -d "$JHALFS_BUILD/rootfs" ]; then
+  rm -rf "$ROOT_DIR"
+  mv "$JHALFS_BUILD/rootfs" "$ROOT_DIR"
 fi
 
 [ -d "$ROOT_DIR" ] || {
   echo "jhalfs completed without producing the expected root filesystem at $ROOT_DIR" >&2
-  echo "Inspect $BUILD_DIR for the generated LFS build output." >&2
+  echo "Inspect $BUILD_DIR and $JHALFS_BUILD for generated LFS build output." >&2
   exit 1
 }
 
