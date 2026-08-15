@@ -1,0 +1,63 @@
+name: Build Rebuilt LFS ISO
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  iso:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bison gawk texinfo wget xz-utils bzip2 cpio gzip rsync \
+            xorriso grub-pc-bin grub-efi-amd64-bin grub-efi-amd64-signed shim-signed \
+            dosfstools mtools squashfs-tools bc flex libelf-dev libssl-dev
+
+      - name: Prepare scripts
+        run: chmod +x scripts/*.sh packages/porg/*.sh desktop/*.sh iso/*.sh
+
+      - name: Initialize LFS rootfs
+        env:
+          ROOT_DIR: ${{ github.workspace }}/work/rootfs
+        run: ./scripts/build-base.sh
+
+      - name: Build Porg
+        env:
+          ROOT_DIR: ${{ github.workspace }}/work/rootfs
+        run: ./packages/porg/build-porg.sh
+
+      - name: Stage Xorg and XFCE
+        env:
+          ROOT_DIR: ${{ github.workspace }}/work/rootfs
+        run: ./desktop/build-xfce.sh
+
+      - name: Integrate desktop
+        env:
+          ROOT_DIR: ${{ github.workspace }}/work/rootfs
+        run: ./scripts/enable-desktop.sh
+
+      - name: Build Linux kernel and initramfs
+        env:
+          ROOT_DIR: ${{ github.workspace }}/work/rootfs
+        run: ./iso/build-kernel.sh
+
+      - name: Build bootable ISO
+        env:
+          ROOT_DIR: ${{ github.workspace }}/work/rootfs
+          OUT_DIR: ${{ github.workspace }}/dist
+        run: ./iso/build-iso.sh
+
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: rebuilt-lfs-iso
+          path: dist/*.iso
+          if-no-files-found: error
