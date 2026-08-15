@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Automated Linux From Scratch build using the official ALFS/jhalfs project.
-# jhalfs is checked out separately from its generated working directory.
+# Keep the jhalfs checkout separate from its generated build directory.
 
 WORK_DIR="${WORK_DIR:-$PWD/work/lfs}"
 JHALFS_SRC="${JHALFS_SRC:-$PWD/work/jhalfs-source}"
@@ -24,7 +24,6 @@ if ! id -u "$LFS_USER" >/dev/null 2>&1; then
   sudo useradd --system --gid "$LFS_GROUP" --home-dir "$LFS_HOME" --create-home --shell /bin/bash "$LFS_USER"
 else
   sudo usermod --home "$LFS_HOME" "$LFS_USER"
-  sudo mkdir -p "$LFS_HOME"
 fi
 sudo mkdir -p "$LFS_HOME"
 sudo chown "$LFS_USER:$LFS_GROUP" "$LFS_HOME"
@@ -35,8 +34,7 @@ fi
 
 cd "$JHALFS_SRC"
 
-# jhalfs uses Kconfig syntax for this file. String-valued settings must be
-# quoted; otherwise Kconfig silently ignores them and falls back to defaults.
+# jhalfs' configuration file is Kconfig syntax. String values must be quoted.
 cat > configuration <<EOF
 BOOK_LFS_SYSD=y
 PROGNAME="lfs"
@@ -59,31 +57,40 @@ LGROUP="${LFS_GROUP}"
 LHOME="${LFS_HOME}"
 EOF
 
-# Make sure menuconfig never tries to open curses in GitHub Actions. The
-# configuration is already complete, so load it through Kconfig's non-UI path
-# and invoke jhalfs' build target directly.
+# The checked-out jhalfs Makefile does not provide Linux-kernel-style
+# olddefconfig. Generate/load the supplied configuration without curses.
+# Kconfig's menuconfig target is intentionally never invoked in Actions.
 export TERM=xterm
-if grep -q '^menuconfig:' Makefile && grep -q '^all:' Makefile; then
-  make -s olddefconfig
-  make -s all
+if [ -f Makefile ] && grep -q '^[[:space:]]*conf:' Makefile; then
+  make -s conf
 else
-  make -s olddefconfig
-  make -s
+  if [ -x ./jhalfs ]; then
+    ./jhalfs -h || true
+  fi
+  echo "Unsupported jhalfs checkout: no noninteractive configuration target was found." >&2
+  echo "Available Make targets:" >&2
+  make -qp 2>/dev/null | awk -F: '/^[A-Za-z0-9_.-]+:([^=]|$)/ {print $1}' | sort -u | head -80 >&2 || true
+  exit 1
 fi
 
-if [ -d "$BUILD_DIR/lfs" ]; then
-  rm -rf "$ROOT_DIR"
-  mv "$BUILD_DIR/lfs" "$ROOT_DIR"
-elif [ -d "$BUILD_DIR/rootfs" ]; then
-  rm -rf "$ROOT_DIR"
-  mv "$BUILD_DIR/rootfs" "$ROOT_DIR"
-elif [ -d "$JHALFS_BUILD/lfs" ]; then
-  rm -rf "$ROOT_DIR"
-  mv "$JHALFS_BUILD/lfs" "$ROOT_DIR"
-elif [ -d "$JHALFS_BUILD/rootfs" ]; then
-  rm -rf "$ROOT_DIR"
-  mv "$JHALFS_BUILD/rootfs" "$ROOT_DIR"
+# The generated build target is provided by jhalfs after configuration.
+if make -qp 2>/dev/null | grep -q '^all:'; then
+  make -s all
+elif make -qp 2>/dev/null | grep -q '^build:'; then
+  make -s build
+else
+  echo "jhalfs generated no supported noninteractive build target." >&2
+  make -qp 2>/dev/null | awk -F: '/^[A-Za-z0-9_.-]+:([^=]|$)/ {print $1}' | sort -u | head -100 >&2 || true
+  exit 1
 fi
+
+for candidate in "$BUILD_DIR/lfs" "$BUILD_DIR/rootfs" "$JHALFS_BUILD/lfs" "$JHALFS_BUILD/rootfs"; do
+  if [ -d "$candidate" ]; then
+    rm -rf "$ROOT_DIR"
+    mv "$candidate" "$ROOT_DIR"
+    break
+  fi
+done
 
 [ -d "$ROOT_DIR" ] || {
   echo "jhalfs completed without producing the expected root filesystem at $ROOT_DIR" >&2
