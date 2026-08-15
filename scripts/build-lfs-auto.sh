@@ -2,8 +2,7 @@
 set -euo pipefail
 
 # Automated Linux From Scratch build using the official ALFS/jhalfs project.
-# jhalfs is checked out here, while its generated working tree lives under
-# BUILDDIR/jhalfs. These directories must be different.
+# jhalfs is checked out separately from its generated working directory.
 
 WORK_DIR="${WORK_DIR:-$PWD/work/lfs}"
 JHALFS_SRC="${JHALFS_SRC:-$PWD/work/jhalfs-source}"
@@ -12,6 +11,9 @@ JHALFS_BUILD="${JHALFS_BUILD:-$BUILD_DIR/jhalfs}"
 LFS_BOOK="${LFS_BOOK:-12.4}"
 JOBS="${JOBS:-2}"
 ROOT_DIR="${ROOT_DIR:-$PWD/work/rootfs}"
+LFS_USER="${LFS_USER:-lfs}"
+LFS_GROUP="${LFS_GROUP:-lfs}"
+LFS_HOME="${LFS_HOME:-/home/lfs}"
 
 mkdir -p "$WORK_DIR" "$BUILD_DIR" "$JHALFS_BUILD" "$(dirname "$JHALFS_SRC")" "$WORK_DIR/source-archive"
 
@@ -40,6 +42,9 @@ NO_PROGRESS_BAR=y
 REBUILD_MAKEFILE=n
 CLEAN=n
 BLFS_TOOL=n
+LUSER=$LFS_USER
+LGROUP=$LFS_GROUP
+LHOME=$LFS_HOME
 EOF
 
 # jhalfs creates its generated scripts/Makefile under JHALFSDIR. The source
